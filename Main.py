@@ -44,18 +44,43 @@ def pack(rawData, table):
 cursor.execute("SELECT * FROM bookings")
 vals = pack(cursor.fetchall(), table="bookings")
 for i, v in vals[0].items():
-    print(type(v))
+    print(v)
 
 def createBooking(data):
     #Check if booking is available for the date and duration
-    cursor.execute("SELECT * FROM bookings")
+    cursor.execute("SELECT * FROM bookings ORDER BY roomId")
     available_rooms = []
     bookingData = pack(cursor.fetchall(), table="bookings")
-    for i in range(1, len(bookingData)):
-        if bookingData[i-1]["dateBooked"]+datetime.timedelta(days = bookingData[i-1]["duration"]) < datetime.timedelta(days = data["dateBooked"]):
-            if bookingData[i] > data["dateBooked"] + datetime.timedelta(days = data[i]["duration"]):
-                available_rooms.append(bookingData[i]["roomId"])
 
-createBooking({"dateBooked":datetime.datetime(2026, 9, 7),"duration": 1,"roomId": 1})
+    #group rooms by room id
+    prev_val = 0
+    temp = []
+    final_list = []
+    for i in bookingData:
+        if i["roomId"] != prev_val:
+            final_list.append(temp)
+            prev_val = i["roomId"]
+            temp = [i]
+        else:
+            temp.append(i)
+    else:
+        final_list.append(temp)
+        final_list.pop(0)
+    print(final_list)
+
+    for group in final_list:
+        for i in range(1, len(group)):
+            #check if date comes after the end of a booking and before the beginning of a new one
+            if data["dateBooked"].date() > group[i-1]["dateBooked"] + datetime.timedelta(days = group[i-1]["duration"]):
+                if data["dateBooked"].date() + datetime.timedelta(days = data["duration"]) < group[i]["dateBooked"]:
+                    available_rooms.append(group[i]["roomId"])
+
+            #check if date comes after the end of the last booking
+            if data["dateBooked"].date() > group[-1]["dateBooked"] + datetime.timedelta(days = group[-1]["duration"]):
+                available_rooms.append(group[-1]["roomId"])
+
+    print(available_rooms)
+
+createBooking({"dateBooked":datetime.datetime(2026, 9, 10),"duration": 2,"roomId": 1})
 
 
