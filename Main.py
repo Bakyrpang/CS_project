@@ -1,5 +1,6 @@
 import mysql.connector
 import flask
+import datetime
 
 config = {
     'user': 'root',
@@ -39,5 +40,22 @@ def pack(rawData, table):
                 formatted_list.append(dict(zip(keys, data)))
 
     return formatted_list
+
+cursor.execute("SELECT * FROM bookings")
+vals = pack(cursor.fetchall(), table="bookings")
+for i, v in vals[0].items():
+    print(type(v))
+
+def createBooking(data):
+    #Check if booking is available for the date and duration
+    cursor.execute("SELECT * FROM bookings")
+    available_rooms = []
+    bookingData = pack(cursor.fetchall(), table="bookings")
+    for i in range(1, len(bookingData)):
+        if bookingData[i-1]["dateBooked"]+datetime.timedelta(days = bookingData[i-1]["duration"]) < datetime.timedelta(days = data["dateBooked"]):
+            if bookingData[i] > data["dateBooked"] + datetime.timedelta(days = data[i]["duration"]):
+                available_rooms.append(bookingData[i]["roomId"])
+
+createBooking({"dateBooked":datetime.datetime(2026, 9, 7),"duration": 1,"roomId": 1})
 
 
