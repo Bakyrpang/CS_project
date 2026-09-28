@@ -46,6 +46,9 @@ def checkAvailability(data):
     cursor.execute("SELECT * FROM bookings ORDER BY roomId, dateBooked")
     available_rooms = []
     bookingData = pack(cursor.fetchall(), table="bookings")
+    cursor.execute("SELECT * FROM rooms ORDER BY roomId")
+    rooms = pack(cursor.fetchall(), table="rooms")
+    rooms = [i["roomId"] for i in rooms] #get just the room Id's
 
     #group rooms by room id
     prev_val = 0
@@ -65,16 +68,20 @@ def checkAvailability(data):
     for group in final_list:
         for i in range(1, len(group)):
             #check if date comes after the end of a booking and before the beginning of a new one
-            if data["dateBooked"].date() > group[i-1]["dateBooked"] + datetime.timedelta(days = group[i-1]["duration"]):
-                if data["dateBooked"].date() + datetime.timedelta(days = data["duration"]) < group[i]["dateBooked"]:
+            if data["dateBooked"].date() >= group[i-1]["dateBooked"] + datetime.timedelta(days = group[i-1]["duration"]):
+                if data["dateBooked"].date() + datetime.timedelta(days = data["duration"]) <= group[i]["dateBooked"]:
                     available_rooms.append(group[i]["roomId"])
 
         #check if date comes after the end of the last booking
-        if data["dateBooked"].date() > group[-1]["dateBooked"] + datetime.timedelta(days = group[-1]["duration"]):
-                available_rooms.append(group[-1]["roomId"])
+        if data["dateBooked"].date() >= group[-1]["dateBooked"] + datetime.timedelta(days = group[-1]["duration"]):
+            available_rooms.append(group[-1]["roomId"])
 
-    if len(final_list) == 0: #if final list is 0, no bookings made, therefore all rooms are available
-        return "all rooms are available"
+        #check if date comes before the first booking
+        if data["dateBooked"].date() + datetime.timedelta(days = data["duration"]) <= group[0]["dateBooked"]:
+            available_rooms.append(group[0]["roomId"])
+
+    #add rooms that have no booking data whatsoever
+    available_rooms.extend([i for i in rooms if all(i != group[0]["roomId"] for group in final_list)])
 
     if data["roomId"] is None:
         return available_rooms if len(available_rooms) > 0 else None
@@ -83,14 +90,16 @@ def checkAvailability(data):
         return available_rooms if len(available_rooms) > 0 else None
 
 def create_booking(data: dict):
-    if checkAvailability(data) is not None:
+    available_rooms = checkAvailability(data)
+    if available_rooms is not None:
+        data["roomId"] = data["roomId"] or available_rooms[0] #give the first available room incase no room is specified
         if data.get("guestId") is None:
             #generate guest Id using sql
             cursor.execute("INSERT INTO Guests(roomId, bookingId, name, age) VALUES(%s, NULL, %s, %s)", [data.get("roomId"), data.get("name"), data.get("age")])
             #add newly generated guest Id into data
             data["guestId"] = cursor.lastrowid
         else:
-            cursor.execute("INSERT INTO Guests(guestId, roomId, bookingId, name, age) VALUES(%s, %s, %s, %s, %s)", [data.get("guestId"), data.get("roomId"), data.get("bookingId"), data.get("name"), data.get("age")])
+            cursor.execute("INSERT IGNORE INTO Guests(guestId, roomId, bookingId, name, age) VALUES(%s, %s, NULL, %s, %s)", [data.get("guestId"), data.get("roomId"), data.get("name"), data.get("age")])
         cursor.execute("INSERT INTO BOOKINGS(dateBooked, duration, guestId, roomId) VALUES(%s, %s, %s, %s)", [data.get("dateBooked"), data.get("duration"), data.get("guestId"), data.get("roomId")])
 
         #get generated booking Id
@@ -98,8 +107,13 @@ def create_booking(data: dict):
         cursor.execute("UPDATE GUESTS SET bookingId = %s WHERE bookingId IS NULL", [data.get("bookingId")])
         database.commit() #commit changes
 
-create_booking({"roomId" : 1,
-                "name" : "a",
+        return True #booking successful
+    else:
+        return False #booking unsuccessful
+
+print(create_booking({"roomId" : None,
+                "name" : "d",
                 "age" : 18,
-                "dateBooked" : datetime.datetime.today(),
-                "duration": 7})
+                "dateBooked" : datetime.datetime.today()+datetime.timedelta(days = 7),
+                "duration": 7,
+                "guestId" : 4}))
