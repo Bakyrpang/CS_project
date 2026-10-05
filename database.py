@@ -17,8 +17,8 @@ cursor = database.cursor()
 
 #Create tables if they dont exist
 cursor.execute("CREATE TABLE IF NOT EXISTS Bookings(bookingId INT AUTO_INCREMENT PRIMARY KEY, dateBooked DATE, duration INT, guestId INT, roomId INT)")
-cursor.execute("CREATE TABLE IF NOT EXISTS Guests(guestId INT AUTO_INCREMENT, roomId INT, bookingId INT, name VARCHAR(30), age INT)")
-cursor.execute("CREATE TABLE IF NOT EXISTS Rooms(roomId INT PRIMARY KEY, occupied BOOL)")
+cursor.execute("CREATE TABLE IF NOT EXISTS Guests(guestId INT AUTO_INCREMENT PRIMARY KEY, roomId INT, bookingId INT, name VARCHAR(30), age INT)")
+cursor.execute("CREATE TABLE IF NOT EXISTS Rooms(roomId INT PRIMARY KEY, occupied BOOL, price DOUBLE)")
 
 def pack(rawData, table):
     formatted_list = []
@@ -29,12 +29,12 @@ def pack(rawData, table):
                 formatted_list.append(dict(zip(keys, data)))
 
         case "guests":
-            keys = ("guestId","roomId", "bookingId", "name", "age")
+            keys = ("guestId","roomId","bookingId","name","age")
             for data in rawData:
                 formatted_list.append(dict(zip(keys, data)))
 
         case "rooms":
-            keys = ("roomId","occupied")
+            keys = ("roomId","occupied","price")
             for data in rawData:
                 formatted_list.append(dict(zip(keys, data)))
 
@@ -98,7 +98,7 @@ def create_booking(data: dict):
             #add newly generated guest Id into data
             data["guestId"] = cursor.lastrowid
         else:
-            cursor.execute("INSERT INTO Guests(guestId, roomId, bookingId, name, age) VALUES(%s, %s, NULL, %s, %s)", [data.get("guestId"), data.get("roomId"), data.get("name"), data.get("age")])
+            cursor.execute("INSERT IGNORE INTO Guests(guestId, roomId, bookingId, name, age) VALUES(%s, %s, NULL, %s, %s)", [data.get("guestId"), data.get("roomId"), data.get("name"), data.get("age")])
         cursor.execute("INSERT INTO BOOKINGS(dateBooked, duration, guestId, roomId) VALUES(%s, %s, %s, %s)", [data.get("dateBooked"), data.get("duration"), data.get("guestId"), data.get("roomId")])
 
         #get generated booking Id
@@ -106,7 +106,7 @@ def create_booking(data: dict):
         cursor.execute("UPDATE GUESTS SET bookingId = %s WHERE bookingId IS NULL", [data.get("bookingId")])
         database.commit() #commit changes
 
-        return True #booking successful
+        return True, data["bookingId"], data["guestId"] #booking successful
     else:
         return False #booking unsuccessful
 
@@ -119,6 +119,25 @@ def search_booking(bookingId, sorting = "bookingId", desc = False):
     cursor.execute("SELECT * FROM Bookings WHERE bookingId = %s ORDER BY %s %s", [bookingId, sorting, "DESC" if desc else "ASC"])
     data = pack(cursor.fetchall(), table="bookings")
     return data
+
+def cancel_booking(bookingId):
+    cursor.execute("DELETE FROM Bookings WHERE bookingId = %s", [bookingId])
+
+def update_booking(bookingId, data):
+    bookingData = search_booking(bookingId, sorting = "bookingId", desc = False)
+    data["roomId"] = data["roomId"] or bookingData[0]["roomId"]
+
+    if len(check_availability(data)) > 0:
+        cursor.execute("UPDATE Bookings SET dateBooked = %s, duration = %s, roomId = %s WHERE bookingId = %s", [data["dateBooked"], data["duration"], data["roomId"], bookingId])
+        return True
+    else:
+        return False
+
+def get_guest_records():
+    cursor.execute("SELECT * FROM Guests")
+    data = pack(cursor.fetchall(), table="guests")
+    return data
+
 
 print(search_booking(3))
 

@@ -1,0 +1,18 @@
+bookings:
+    bookingId
+    dateBooked
+    duration
+    guestId
+    roomId
+
+guests:
+    guestId
+    roomId
+    bookingId
+    name
+    age
+
+rooms:
+    roomId
+    occupied
+    price
