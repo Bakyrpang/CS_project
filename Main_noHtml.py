@@ -2,10 +2,10 @@ import database
 import datetime
 
 #define values in outer scope
-dateBooked = roomId = guestId = success = data = rooms = None
+dateBooked = roomId = guestId = success = data = rooms = duration = None
 
 def refresh_values():
-    dateBooked = roomId = guestId = success = data = rooms = None
+    dateBooked = roomId = guestId = success = data = rooms = duration = None
 
 while True:
     print('''select option: 
@@ -90,12 +90,16 @@ while True:
 
         case 6:
             data = {}
-            data['bookingId'] = int(input('Enter booking ID: '))
+            bookingId = input('Enter booking ID: ')
+            bookingId = int(bookingId) if bookingId else None
+            print("skip following parameters if unchanged")
+            data['bookingId'] = int(bookingId) if bookingId else None
             dateBooked = input('Enter date of booking(DD/MM/YYYY): ')
-            dateBooked = datetime.datetime.strptime(dateBooked, '%d/%m/%Y')
+            dateBooked = datetime.datetime.strptime(dateBooked, '%d/%m/%Y') if dateBooked else None
             data["dateBooked"] = dateBooked
-            data["duration"] = int(input('Enter duration of booking: '))
-            roomId = input('Enter room ID(skip if not specified): ')
+            duration = input('Enter duration of booking: ')
+            data['duration'] = int(duration) if duration else None
+            roomId = input('Enter room ID: ')
             data['roomId'] = int(roomId) if roomId else None
             success = database.update_booking(data['bookingId'], data)
             if success:
@@ -113,4 +117,4 @@ while True:
             refresh_values()
 
         case 8:
-            exit()
+            break

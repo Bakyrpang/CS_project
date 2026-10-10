@@ -117,12 +117,12 @@ def create_booking(data: dict):
         return False #booking unsuccessful
 
 def search_guest(guestId, sorting = "guestId", desc = False):
-    cursor.execute("SELECT * FROM Guests WHERE guestId = %s ORDER BY %s %s", [guestId, sorting, "DESC" if desc else "ASC"])
+    cursor.execute(f"SELECT * FROM Guests WHERE guestId = %s ORDER BY %s {"DESC" if desc else "ASC"}", [guestId, sorting])
     data = pack(cursor.fetchall(), table="guests")
     return data
 
 def search_booking(bookingId, sorting = "bookingId", desc = False):
-    cursor.execute("SELECT * FROM Bookings WHERE bookingId = %s ORDER BY %s %s", [bookingId, sorting, "DESC" if desc else "ASC"])
+    cursor.execute(f"SELECT * FROM Bookings WHERE bookingId = %s ORDER BY %s {"DESC" if desc else "ASC"}", [bookingId, sorting])
     data = pack(cursor.fetchall(), table="bookings")
     return data
 
@@ -134,8 +134,10 @@ def cancel_booking(bookingId):
 def update_booking(bookingId, data):
     bookingData = search_booking(bookingId, sorting = "bookingId", desc = False)
     data["roomId"] = data["roomId"] or bookingData[0]["roomId"]
+    data["duration"] = data["duration"] or bookingData[0]["duration"]
+    data["dateBooked"] = data["dateBooked"] or bookingData[0]["dateBooked"]
 
-    if check_availability(data, bookingId):
+    if check_availability(data, bookingId) and bookingId is not None:
         cursor.execute("UPDATE Bookings SET dateBooked = %s, duration = %s, roomId = %s WHERE bookingId = %s", [data["dateBooked"], data["duration"], data["roomId"], bookingId])
         database.commit()
         return True
