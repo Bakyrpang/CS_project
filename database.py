@@ -6,8 +6,14 @@ config = {
     'password': 'Password123',
     'host': 'localhost',
 }
-
-database = mysql.connector.connect(**config)
+while True:
+    try:
+        database = mysql.connector.connect(**config)
+        break
+    except mysql.connector.Error as err:
+        print("Something went wrong: {}".format(err))
+        if input("try again? (y/n): ") == 'n':
+            exit()
 
 #Create main database if it doesn't exist
 database._execute_query("CREATE DATABASE IF NOT EXISTS Hotel")
@@ -40,9 +46,9 @@ def pack(rawData, table):
 
     return formatted_list
 
-def check_availability(data):
+def check_availability(data, exclude = 0):
     #Check if booking is available for the date and duration
-    cursor.execute("SELECT * FROM bookings ORDER BY roomId, dateBooked")
+    cursor.execute("SELECT * FROM bookings WHERE bookingId != %s ORDER BY roomId, dateBooked", [exclude])
     available_rooms = []
     bookingData = pack(cursor.fetchall(), table="bookings")
     cursor.execute("SELECT * FROM rooms ORDER BY roomId")
@@ -122,13 +128,16 @@ def search_booking(bookingId, sorting = "bookingId", desc = False):
 
 def cancel_booking(bookingId):
     cursor.execute("DELETE FROM Bookings WHERE bookingId = %s", [bookingId])
+    cursor.execute("DELETE FROM Guests WHERE bookingId = %s", [bookingId])
+    database.commit()
 
 def update_booking(bookingId, data):
     bookingData = search_booking(bookingId, sorting = "bookingId", desc = False)
     data["roomId"] = data["roomId"] or bookingData[0]["roomId"]
 
-    if len(check_availability(data)) > 0:
+    if check_availability(data, bookingId):
         cursor.execute("UPDATE Bookings SET dateBooked = %s, duration = %s, roomId = %s WHERE bookingId = %s", [data["dateBooked"], data["duration"], data["roomId"], bookingId])
+        database.commit()
         return True
     else:
         return False
